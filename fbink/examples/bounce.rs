@@ -6,6 +6,10 @@
 //! DU waveform (light ghosting, never flashes), paced by
 //! [`Fbink::wait_for_complete`].
 //!
+//! The screen is snapshotted ([`Fbink::dump`]) before the first pixel is
+//! painted and restored ([`Fbink::restore`]) on exit, so the device's own
+//! UI is exactly as we found it: it doesn't know it needs to redraw itself.
+//!
 //! Usage: `bounce [SECONDS]` (default 15; 0 = run until Ctrl-C).
 //! Run it on a device with an eInk framebuffer; host builds are for
 //! compile-testing only. See the README for cross-compiling recipes.
@@ -31,6 +35,17 @@ fn main() -> fbink::Result<()> {
     let fb = Fbink::open()?;
     // Init once (from the main thread!), keeping FBInk's setup chatter quiet.
     fb.init(&Config::new().quiet(true))?;
+
+    // Snapshot the current screen (the device's own UI) before painting
+    // anything: it gets restored on exit, because the UI won't redraw
+    // itself just because we were here.
+    let snapshot = match fb.dump() {
+        Ok(dump) => Some(dump),
+        Err(e) => {
+            eprintln!("warning: dump failed ({e}); the screen will be cleared on exit");
+            None
+        }
+    };
 
     // Start from a clean slate: clear, then caption; the ball plays below it.
     // `get_last_rect` tells us where the printed line actually landed.
@@ -108,16 +123,17 @@ fn main() -> fbink::Result<()> {
         }
     }
 
-    // Clear the screen & do a full flashing refresh to flush any ghosting.
-    fb.cls(&Config::new().no_refresh(true), None, false)?;
-    fb.print("demo done!", &title)?;
-    fb.refresh(
-        0,
-        0,
-        0,
-        0,
-        &Config::new().waveform(WaveformMode::Gc16).flashing(true),
-    )?;
+    // Leave the screen exactly as we found it: repaint the UI snapshot.
+    // `restore` honors the config's refresh flags, like `refresh`.
+    let bye = Config::new().waveform(WaveformMode::Gc16);
+    match &snapshot {
+        Some(dump) => fb.restore(&bye, dump)?,
+        // Fallback when there is no snapshot: blank screen + refresh.
+        None => {
+            fb.cls(&Config::new().no_refresh(true), None, false)?;
+            fb.refresh(0, 0, 0, 0, &bye)?;
+        }
+    }
     fb.wait_for_complete(LAST_MARKER)?;
 
     println!(
