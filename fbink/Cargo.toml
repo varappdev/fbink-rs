@@ -27,3 +27,7 @@ required-features = ["bitmap"]
 
 [[example]]
 name = "state"
+
+[[example]]
+name = "bounce"
+required-features = ["bitmap"]

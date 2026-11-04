@@ -233,11 +233,16 @@ fn fbink_target() -> String {
 /// unparseable diffs abort the build loudly. See `patches/README.md`.
 fn apply_patches(fbink_src: &Path) {
     let patches_dir =
-        PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set")).join("patches");
+        PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set"))
+            .join("patches");
     for name in PATCHES {
         let patch_path = patches_dir.join(name);
-        let patch = fs::read_to_string(&patch_path)
-            .unwrap_or_else(|e| panic!("fbink-sys: cannot read local patch {}: {e}", patch_path.display()));
+        let patch = fs::read_to_string(&patch_path).unwrap_or_else(|e| {
+            panic!(
+                "fbink-sys: cannot read local patch {}: {e}",
+                patch_path.display()
+            )
+        });
         let (rel_path, hunks) = parse_patch(&patch)
             .unwrap_or_else(|e| panic!("fbink-sys: cannot parse local patch {name}: {e}"));
         let target = fbink_src.join(&rel_path);
@@ -282,7 +287,8 @@ fn parse_patch(patch: &str) -> Result<(String, Vec<(String, String)>), String> {
 
     // File header: "--- a/<path>" followed by "+++ b/<path>".
     let mut i = 0;
-    while i + 1 < lines.len() && !(lines[i].starts_with("--- ") && lines[i + 1].starts_with("+++ ")) {
+    while i + 1 < lines.len() && !(lines[i].starts_with("--- ") && lines[i + 1].starts_with("+++ "))
+    {
         i += 1;
     }
     if i + 1 >= lines.len() {
@@ -370,7 +376,9 @@ fn hunk_counts(header: &str) -> Result<(usize, usize), String> {
             .strip_prefix(['-', '+'])
             .ok_or(format!("bad hunk range `{range}`"))?;
         match rest.split_once(',') {
-            Some((_, n)) => n.parse().map_err(|_| format!("bad hunk count in `{range}`")),
+            Some((_, n)) => n
+                .parse()
+                .map_err(|_| format!("bad hunk count in `{range}`")),
             None => Ok(1),
         }
     };

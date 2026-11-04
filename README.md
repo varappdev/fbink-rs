@@ -29,8 +29,10 @@ fn main() -> fbink::Result<()> {
 }
 ```
 
-See `fbink/examples/hello.rs` (`cargo run -p fbink --example hello`) and
-`fbink/examples/state.rs` (dump of every `State` field). Errors are typed
+See `fbink/examples/hello.rs` (`cargo run -p fbink --example hello`),
+`fbink/examples/state.rs` (dump of every `State` field) and
+`fbink/examples/bounce.rs` (an animated bouncing ball: dirty-region refreshes
+in the fast DU waveform). Errors are typed
 (`Error::NotSupported`, `Error::Invalid`, …); feature- or platform-unsupported calls fail
 with `Error::NotSupported` at runtime.
 
