@@ -5,10 +5,14 @@
 //!      actually needed to build it (`font8x8`, `stb` and `libunibreak`), and
 //!      `i2c-tools` for Kobo targets. Everything is cached under the target
 //!      directory.
-//!   2. Compile FBInk into a static library with `cc`, honoring the crate's
+//!   2. Apply the local patches in `patches/` to the FBInk source (also when
+//!      built from `FBINK_SOURCE_DIR`, which is modified in place) as strict
+//!      exact-text splices of their unified-diff hunks. Patches that no longer
+//!      apply fail the build loudly; see `patches/README.md`.
+//!   3. Compile FBInk into a static library with `cc`, honoring the crate's
 //!      feature flags (mapped to FBInk's `FBINK_WITH_*` defines) and the
 //!      requested target platform.
-//!   3. Generate Rust bindings from FBInk's public `fbink.h` via `bindgen`.
+//!   4. Generate Rust bindings from FBInk's public `fbink.h` via `bindgen`.
 //!
 //! Environment variables:
 //!   * `FBINK_TARGET`: target platform, one of `linux` (default), `kobo`,
@@ -30,6 +34,11 @@ use std::process::Command;
 // NOTE: FBInk's API is not frozen on master: when bumping this, diff `fbink.h`
 //       and adjust the safe wrapper accordingly.
 const FBINK_COMMIT: &str = "886f25f13368859ad8a899b88d04c26e19cda32e";
+// Local patches applied to the FBInk source before compiling (plain unified
+// diffs in `patches/`, see `patches/README.md`). Fix known upstream bugs;
+// when bumping the pin, each patch must either keep applying or be rebased /
+// dropped: anything else fails the build loudly.
+const PATCHES: &[&str] = &["fix-fbink_state_dump-varargs-non-kobo.patch"];
 // The handful of submodules actually required to build the library.
 const FONT8X8_COMMIT: &str = "fa74831b9076805271cdedc0ee12137aa548e524";
 const STB_COMMIT: &str = "dfa32facac4a16184dd66f8e482bf15a678f2bf3";
@@ -50,6 +59,10 @@ fn main() {
     println!("cargo:rerun-if-env-changed=FBINK_TARGET");
     println!("cargo:rerun-if-env-changed=FBINK_SOURCE_DIR");
     println!("cargo:rerun-if-env-changed=FBINK_FETCH");
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=Cargo.toml");
+    println!("cargo:rerun-if-changed=src");
+    println!("cargo:rerun-if-changed=patches");
 
     // Feature flags (as enabled on this crate), resolved with FBInk's own
     // feature implications (c.f., FBInk's Makefile).
@@ -82,6 +95,7 @@ fn main() {
         Some(dir) => local_source(PathBuf::from(dir), &cache),
         None => fetched_sources(&cache),
     };
+    apply_patches(&fbink_src);
 
     //
     // Compile FBInk.
@@ -208,6 +222,159 @@ fn fbink_target() -> String {
             "linux".to_owned()
         }
     }
+}
+
+/// Apply the local patches in `patches/` to the FBInk source tree.
+///
+/// Patches are plain unified diffs for a single file. Each hunk's exact
+/// preimage must occur exactly once in the target file and is replaced by its
+/// postimage; a hunk whose postimage is already in place is skipped (the
+/// source cache outlives rebuilds). Ambiguous matches, missing context or
+/// unparseable diffs abort the build loudly. See `patches/README.md`.
+fn apply_patches(fbink_src: &Path) {
+    let patches_dir =
+        PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set")).join("patches");
+    for name in PATCHES {
+        let patch_path = patches_dir.join(name);
+        let patch = fs::read_to_string(&patch_path)
+            .unwrap_or_else(|e| panic!("fbink-sys: cannot read local patch {}: {e}", patch_path.display()));
+        let (rel_path, hunks) = parse_patch(&patch)
+            .unwrap_or_else(|e| panic!("fbink-sys: cannot parse local patch {name}: {e}"));
+        let target = fbink_src.join(&rel_path);
+        let mut source = fs::read_to_string(&target)
+            .unwrap_or_else(|e| panic!("fbink-sys: cannot read {}: {e}", target.display()));
+        let mut changed = false;
+        for (preimage, postimage) in &hunks {
+            match source.matches(preimage.as_str()).count() {
+                1 => {
+                    source = source.replace(preimage.as_str(), postimage.as_str());
+                    changed = true;
+                }
+                0 if source.matches(postimage.as_str()).count() == 1 => {
+                    // Already applied: nothing to do.
+                }
+                0 => panic!(
+                    "fbink-sys: local patch {name} no longer applies to {rel_path}.\n\
+                     The FBInk pin was likely bumped (or the source was modified).\n\
+                     Rebase the patch in fbink-sys/patches/ if the bug it fixes is still\n\
+                     present upstream, or drop it if not (see fbink-sys/patches/README.md).\n\
+                     When iterating on the patch itself, wipe the source cache first:\n\
+                     `cargo clean` or `rm -rf target/*/build/fbink-sys-src`."
+                ),
+                n => panic!(
+                    "fbink-sys: local patch {name} matches {n} places in {rel_path}; \
+                     add context lines to its hunk"
+                ),
+            }
+        }
+        if changed {
+            fs::write(&target, source)
+                .unwrap_or_else(|e| panic!("fbink-sys: cannot write {}: {e}", target.display()));
+            println!("cargo:warning=fbink-sys: applied local patch {name} to the FBInk source");
+        }
+    }
+}
+
+/// Parse the single file section of a unified diff into its target path and
+/// its hunks as exact `(preimage, postimage)` line blocks.
+fn parse_patch(patch: &str) -> Result<(String, Vec<(String, String)>), String> {
+    let lines: Vec<&str> = patch.lines().collect();
+
+    // File header: "--- a/<path>" followed by "+++ b/<path>".
+    let mut i = 0;
+    while i + 1 < lines.len() && !(lines[i].starts_with("--- ") && lines[i + 1].starts_with("+++ ")) {
+        i += 1;
+    }
+    if i + 1 >= lines.len() {
+        return Err("no `--- `/`+++ ` file header found".to_owned());
+    }
+    let name = lines[i + 1]
+        .split_whitespace()
+        .nth(1)
+        .ok_or("empty file name in `+++ ` line")?;
+    let rel_path = name.strip_prefix("b/").unwrap_or(name).to_owned();
+    if rel_path.is_empty() || rel_path.starts_with('/') || rel_path.contains("..") {
+        return Err(format!("refusing to patch `{rel_path}`"));
+    }
+    i += 2;
+
+    // Hunks, consumed strictly by their declared line counts.
+    let mut hunks = Vec::new();
+    while i < lines.len() {
+        let header = lines[i];
+        if header.starts_with("--- ") {
+            return Err("multi-file patches are not supported".to_owned());
+        }
+        if !header.starts_with("@@ ") {
+            if hunks.is_empty() {
+                return Err(format!("unexpected line before first hunk: {header:?}"));
+            }
+            i += 1; // Tolerate trailing noise (e.g. a git signature).
+            continue;
+        }
+        let (old_count, new_count) = hunk_counts(header)?;
+        i += 1;
+
+        let (mut old, mut new) = (String::new(), String::new());
+        let (mut oc, mut nc) = (0usize, 0usize);
+        while (oc < old_count || nc < new_count) && i < lines.len() {
+            let line = lines[i];
+            i += 1;
+            if line.starts_with('\\') {
+                continue; // "\ No newline at end of file"
+            }
+            let (marker, text) = match line.chars().next() {
+                Some(m @ (' ' | '-' | '+')) => (m, &line[1..]),
+                None => (' ', ""), // Some tools emit context empty lines as "".
+                _ => return Err(format!("unexpected line in hunk: {line:?}")),
+            };
+            match marker {
+                ' ' if oc < old_count && nc < new_count => {
+                    old.push_str(text);
+                    old.push('\n');
+                    new.push_str(text);
+                    new.push('\n');
+                    oc += 1;
+                    nc += 1;
+                }
+                '-' if oc < old_count => {
+                    old.push_str(text);
+                    old.push('\n');
+                    oc += 1;
+                }
+                '+' if nc < new_count => {
+                    new.push_str(text);
+                    new.push('\n');
+                    nc += 1;
+                }
+                _ => return Err(format!("hunk line count mismatch: {line:?}")),
+            }
+        }
+        if oc != old_count || nc != new_count {
+            return Err("truncated hunk".to_owned());
+        }
+        hunks.push((old, new));
+    }
+    if hunks.is_empty() {
+        return Err("no hunks found".to_owned());
+    }
+    Ok((rel_path, hunks))
+}
+
+/// The `(old, new)` line counts of a `@@ -a[,b] +c[,d] @@` hunk header.
+fn hunk_counts(header: &str) -> Result<(usize, usize), String> {
+    let mut ranges = header[3..].split_whitespace();
+    let count = |range: Option<&str>| -> Result<usize, String> {
+        let range = range.ok_or("missing range in hunk header")?;
+        let rest = range
+            .strip_prefix(['-', '+'])
+            .ok_or(format!("bad hunk range `{range}`"))?;
+        match rest.split_once(',') {
+            Some((_, n)) => n.parse().map_err(|_| format!("bad hunk count in `{range}`")),
+            None => Ok(1),
+        }
+    };
+    Ok((count(ranges.next())?, count(ranges.next())?))
 }
 
 /// Cache directory for downloaded sources: `<target>/<profile>/build/fbink-sys-src`.

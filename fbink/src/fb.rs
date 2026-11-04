@@ -222,6 +222,21 @@ impl Fbink {
     }
 
     /// Dump FBInk's state to stdout in a shell-consumable (`eval`) format.
+    ///
+    /// # Upstream bug (patched at build time)
+    ///
+    /// At the pinned FBInk revision (`886f25f`), `fbink_state_dump`'s
+    /// `fprintf` passes only two arguments for three format specifiers on
+    /// non-Kobo builds (the `#else` branch of the `isTolino`/`SunxiHasFBDamage`/
+    /// `SunxiForceRota` triplet). The remaining values shift by one, so
+    /// `pixelFormat='%s'` receives an integer (0 or 1) as a pointer and the
+    /// call **segfaults the process**. Reproduced on a Kindle Basic 5 (22D)
+    /// with the stock FBInk 1.25.0 binary (`fbink -e`); still unfixed on
+    /// upstream `master`.
+    ///
+    /// `fbink-sys` applies a fix to the bundled source at build time
+    /// (see `fbink-sys/patches/`), so calls through this crate are safe; the
+    /// crash only reproduces with unpatched FBInk builds.
     pub fn state_dump(&self, cfg: &Config) {
         // Safety: cfg is a valid reference.
         unsafe { sys::fbink_state_dump(cfg.raw()) };
