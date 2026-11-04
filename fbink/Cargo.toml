@@ -1,0 +1,29 @@
+[package]
+name = "fbink"
+description = "Safe, idiomatic Rust bindings to FBInk, a library to print text & images to an eInk Linux framebuffer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+fbink-sys = { path = "../fbink-sys", default-features = false }
+
+[features]
+default = ["draw", "bitmap", "fonts", "image", "opentype", "input"]
+draw = ["fbink-sys/draw"]
+bitmap = ["fbink-sys/bitmap"]
+fonts = ["fbink-sys/fonts"]
+unifont = ["fbink-sys/unifont"]
+image = ["fbink-sys/image"]
+opentype = ["fbink-sys/opentype"]
+input = ["fbink-sys/input"]
+button-scan = ["fbink-sys/button-scan"]
+
+[[example]]
+name = "hello"
+required-features = ["bitmap"]
+
+[[example]]
+name = "state"

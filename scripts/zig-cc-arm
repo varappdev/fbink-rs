@@ -1,0 +1,37 @@
+#!/bin/sh
+# Cross C compiler/linker wrapper for ARMv7 hard-float Linux (musl),
+# used both by the `cc` crate (fbink-sys/build.rs) and as the Rust target linker.
+#
+# Requires `zig` in PATH; no cross-gcc needed.
+#
+# cc-rs (and rustc) append their own `--target=<triple>` flags, which zig's
+# target query parser rejects ("arm-unknown-linux-musleabihf" is not a valid
+# zig target). We always pin the target ourselves, so filter those out.
+# rustc also passes a linker *optimization* flag (-Wl,-O1) that lld merely
+# warns about ("ignoring deprecated linker optimization setting"); drop it on
+# link invocations (i.e. when not compiling with -c/-S). Keep -O flags on
+# compile invocations: those are real codegen optimization levels.
+has_c=0
+for arg in "$@"; do
+    case "$arg" in
+        -c | -S) has_c=1 ;;
+    esac
+done
+
+count=$#
+while [ "$count" -gt 0 ]; do
+    arg=$1
+    shift
+    count=$((count - 1))
+    case "$arg" in
+        --target=*) ;;
+        -O | -O[0-9] | -Os | -Wl,-O | -Wl,-O[0-9] | -Wl,-Os)
+            if [ "$has_c" -eq 1 ]; then
+                set -- "$@" "$arg"
+            fi
+            ;;
+        *) set -- "$@" "$arg" ;;
+    esac
+done
+
+exec zig cc -target arm-linux-musleabihf -mcpu=generic+v7a+vfp3 "$@"
