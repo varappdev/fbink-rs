@@ -1,0 +1,119 @@
+# Custom macro attribute for lockable Git LFS assets
+[attr]lfs filter=lfs diff=lfs merge=lfs -text lockable
+
+# Text normalization
+* text=auto eol=lf
+
+# --- Images ---
+*.apng lfs
+*.avif lfs
+*.png lfs
+*.jpg lfs
+*.jpeg lfs
+*.jxl lfs
+*.gif lfs
+*.webp lfs
+*.ico lfs
+*.bmp lfs
+*.tiff lfs
+*.tif lfs
+*.psd lfs
+*.ai lfs
+*.eps lfs
+*.svg lfs
+*.raw lfs
+*.hdr lfs
+*.exr lfs
+*.heic lfs
+*.heif lfs
+
+# --- Audio ---
+*.mp3 lfs
+*.wav lfs
+*.ogg lfs
+*.flac lfs
+*.m4a lfs
+*.aac lfs
+*.aiff lfs
+*.aif lfs
+*.mid lfs
+*.midi lfs
+*.wma lfs
+*.opus lfs
+
+# --- Video ---
+*.mp4 lfs
+*.mov lfs
+*.avi lfs
+*.mkv lfs
+*.webm lfs
+*.flv lfs
+*.wmv lfs
+*.m4v lfs
+*.3gp lfs
+*.ogv lfs
+
+# --- 3D Models & Assets ---
+*.obj lfs
+*.fbx lfs
+*.gltf lfs
+*.glb lfs
+*.stl lfs
+*.blend lfs
+*.dae lfs
+*.3ds lfs
+*.ply lfs
+*.usda lfs
+*.usdc lfs
+*.usdz lfs
+*.max lfs
+*.mb lfs
+*.ma lfs
+
+# --- Non-Plaintext Documents & Spreadsheets ---
+*.pdf lfs
+*.doc lfs
+*.docx lfs
+*.xls lfs
+*.xlsx lfs
+*.ppt lfs
+*.pptx lfs
+*.odt lfs
+*.ods lfs
+*.odp lfs
+*.rtf lfs
+*.epub lfs
+
+# --- Archives & Compressed Files ---
+*.zip lfs
+*.tar lfs
+*.gz lfs
+*.bz2 lfs
+*.xz lfs
+*.7z lfs
+*.rar lfs
+*.tgz lfs
+
+# --- Fonts ---
+*.ttf lfs
+*.otf lfs
+*.woff lfs
+*.woff2 lfs
+*.eot lfs
+
+# --- Binaries & Databases ---
+*.apk lfs
+*.aab lfs
+*.aar lfs
+*.jar lfs
+*.so lfs
+*.dylib lfs
+*.dll lfs
+*.exe lfs
+*.class lfs
+*.db lfs
+*.sqlite lfs
+*.sqlite3 lfs
+*.bin lfs
+*.dat lfs
+
