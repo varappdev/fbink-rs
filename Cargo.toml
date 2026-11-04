@@ -5,5 +5,5 @@ members = ["fbink-sys", "fbink"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
-repository = "https://github.com/NiLuJe/FBInk"
+repository = "https://github.com/varappdev/fbink-rs.git"
 license = "GPL-3.0-or-later"
