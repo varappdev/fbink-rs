@@ -16,7 +16,7 @@
 
 use std::time::{Duration, Instant};
 
-use fbink::{Config, Fbink, Font, Rect, WaveformMode, LAST_MARKER};
+use fbink::{Config, Fbink, Font, LAST_MARKER, Rect, WaveformMode};
 
 /// Ball radius, in pixels.
 const RADIUS: i32 = 60;

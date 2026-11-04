@@ -5,7 +5,8 @@
 use fbink_sys as sys;
 
 /// A rectangle in absolute framebuffer coordinates.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Rect {
     /// x
     pub left: u16,

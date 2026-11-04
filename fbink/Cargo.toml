@@ -3,12 +3,17 @@ name = "fbink"
 description = "Safe, idiomatic Rust bindings to FBInk, a library to print text & images to an eInk Linux framebuffer"
 version.workspace = true
 edition.workspace = true
-rust-version.workspace = true
 repository.workspace = true
 license.workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+
 [dependencies]
 fbink-sys = { path = "../fbink-sys", default-features = false }
+serde = { version = "1.0.229", features = ["derive"], optional = true }
+strum = { version = "0.28.0", features = ["derive"] }
+thiserror = "2"
 
 [features]
 default = ["draw", "bitmap", "fonts", "image", "opentype", "input"]
@@ -20,6 +25,7 @@ image = ["fbink-sys/image"]
 opentype = ["fbink-sys/opentype"]
 input = ["fbink-sys/input"]
 button-scan = ["fbink-sys/button-scan"]
+serde = ["dep:serde"]
 
 [[example]]
 name = "hello"
@@ -31,3 +37,6 @@ name = "state"
 [[example]]
 name = "bounce"
 required-features = ["bitmap"]
+
+[dev-dependencies]
+serde_json = "1.0.154"

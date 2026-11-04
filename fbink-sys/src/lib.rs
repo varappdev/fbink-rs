@@ -4,7 +4,8 @@
 //!
 //! This is the `-sys` crate: everything here is `unsafe`, thinly documented and
 //! maps 1:1 to FBInk's C API (see FBInk's own `fbink.h` for the authoritative
-//! documentation). For a safe, idiomatic API, use the [`fbink`] crate instead.
+//! documentation). For a safe, idiomatic API, use the [`fbink`](https://docs.rs/fbink)
+//! crate instead.
 //!
 //! # Versioning
 //!

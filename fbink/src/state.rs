@@ -12,6 +12,7 @@ use std::os::raw::c_char;
 /// Obtained via [`crate::Fbink::state`]. The C `char[]` arrays are converted
 /// to `String`s, and the nullable `font_name` pointer to an `Option<String>`.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct State {
     /// `USER_HZ` (should pretty much always be 100).
     pub user_hz: i64,
@@ -223,5 +224,16 @@ mod tests {
     #[test]
     fn null_pointer_maps_to_none() {
         assert_eq!(c_str_opt(std::ptr::null()), None);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serde_roundtrips_state() {
+        // A zeroed C state -> owned State (empty strings, no font name).
+        let raw: sys::FBInkState = unsafe { std::mem::zeroed() };
+        let state = State::from_raw(&raw);
+        let json = serde_json::to_string(&state).unwrap();
+        let back: State = serde_json::from_str(&json).unwrap();
+        assert_eq!(state, back);
     }
 }

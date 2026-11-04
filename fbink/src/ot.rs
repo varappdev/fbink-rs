@@ -8,7 +8,7 @@
 
 use crate::config::Config;
 use crate::enums::{FontStyle, Padding};
-use crate::error::{check, cstring, Error, Result};
+use crate::error::{Error, Result, check, cstring};
 use crate::fb::Fbink;
 use fbink_sys as sys;
 
@@ -162,7 +162,8 @@ impl Drop for OtConfig {
 }
 
 /// Line-breaking & fitting information for a [`Fbink::print_ot_fit`] call.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct OtFit {
     /// Expected amount of lines needed, according to font metrics.
     pub computed_lines: u16,
@@ -175,7 +176,8 @@ pub struct OtFit {
 }
 
 /// The width/height of an [`OtFit`]'s bounding box.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct OtBBox {
     pub width: u16,
     pub height: u16,

@@ -37,11 +37,16 @@
 //! | `opentype` | `FBINK_WITH_OPENTYPE` | TrueType/OpenType text (implies `draw`) |
 //! | `input` | `FBINK_WITH_INPUT` | input device scanning |
 //! | `button-scan` | `FBINK_WITH_BUTTON_SCAN` | deprecated Kobo USBMS scanner (implies `draw`) |
+//! | `serde` | — | `Serialize`/`Deserialize` on the public types |
 //!
 //! Everything is compiled regardless (the default features reproduce a
 //! standard full-featured FBInk build): calling into a disabled feature simply
 //! fails at runtime with [`Error::NotSupported`]. The exceptions are the
 //! [`ot`] & [`input`] modules, which are only compiled with their feature.
+//!
+//! Beyond the FBInk feature map, the fieldless enums implement `Display` &
+//! `FromStr` round-tripping their variant names (`"Gc16"`, `"UnsciiAlt"`, ...)
+//! as well as `EnumIter`/`EnumCount`, courtesy of `strum`.
 //!
 //! # Platform
 //!
@@ -62,14 +67,18 @@
 //! FBInk is GPL-3.0-or-later and statically linked: the resulting binary is
 //! subject to the same terms.
 
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 mod config;
 mod dump;
 mod enums;
 mod error;
 mod fb;
 #[cfg(feature = "input")]
+#[cfg_attr(docsrs, doc(cfg(feature = "input")))]
 pub mod input;
 #[cfg(feature = "opentype")]
+#[cfg_attr(docsrs, doc(cfg(feature = "opentype")))]
 pub mod ot;
 mod rect;
 mod state;
@@ -82,8 +91,8 @@ pub use enums::{
 };
 pub use error::{Error, Result};
 pub use fb::{
-    Fbink, Features, PackedPixel, ReinitChanges, KEEP_CURRENT_BITDEPTH, KEEP_CURRENT_GRAYSCALE,
-    KEEP_CURRENT_ROTATE, LAST_MARKER, TOGGLE_GRAYSCALE,
+    Fbink, Features, KEEP_CURRENT_BITDEPTH, KEEP_CURRENT_GRAYSCALE, KEEP_CURRENT_ROTATE,
+    LAST_MARKER, PackedPixel, ReinitChanges, TOGGLE_GRAYSCALE,
 };
 pub use rect::Rect;
 pub use state::State;

@@ -3,7 +3,7 @@
 //! Run it on a device with an eInk framebuffer; host builds are for
 //! compile-testing only. See the README for cross-compiling recipes.
 
-use fbink::{Config, Fbink, Font, WaveformMode, LAST_MARKER};
+use fbink::{Config, Fbink, Font, LAST_MARKER, WaveformMode};
 
 fn main() -> fbink::Result<()> {
     let fb = Fbink::open()?;

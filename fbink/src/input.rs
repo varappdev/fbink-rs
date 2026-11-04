@@ -5,12 +5,12 @@
 //! allocation right away. Any device fd FBInk leaves open is wrapped in an
 //! [`OwnedFd`], which closes it on drop.
 
-use crate::error::{cstring, Error, Result};
+use crate::error::{Error, Result, cstring};
 use fbink_sys as sys;
 use std::os::fd::{FromRawFd, OwnedFd};
 use std::os::raw::{c_char, c_void};
 
-extern "C" {
+unsafe extern "C" {
     // FBInk allocates the scan results with malloc(): free them with libc's
     // free(). Declared by hand to avoid pulling in `libc`.
     fn free(ptr: *mut c_void);
@@ -18,7 +18,8 @@ extern "C" {
 
 /// Bitmask of input device types, as classified by FBInk/udev
 /// (`INPUT_DEVICE_TYPE_E`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct InputDeviceType(u32);
 
 impl InputDeviceType {
@@ -69,7 +70,8 @@ impl std::ops::BitOr for InputDeviceType {
 }
 
 /// Bitmask of scan behavior settings (`INPUT_SETTINGS_TYPE_E`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct InputSettings(u32);
 
 impl InputSettings {

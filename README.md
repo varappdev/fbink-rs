@@ -51,8 +51,15 @@ implications); without any feature you get a true MINIMAL build:
 | `opentype` | `FBINK_WITH_OPENTYPE` | TrueType/OpenType text (implies `draw`) |
 | `input` | `FBINK_WITH_INPUT` | input device scanning |
 | `button-scan` | `FBINK_WITH_BUTTON_SCAN` | deprecated Kobo USBMS scanner (implies `draw`) |
+| `serde` | — | `Serialize`/`Deserialize` on the public types |
 
-Default = all except `unifont` & `button-scan` (i.e. a standard full-featured FBInk).
+Default = all except `unifont`, `button-scan` & `serde` (i.e. a standard full-featured FBInk).
+
+The fieldless enums also implement `Display` & `FromStr` round-tripping their variant
+names (`"Gc16"`, `"UnsciiAlt"`, …) plus `EnumIter`/`EnumCount` (via `strum`), and errors
+implement `std::error::Error` via `thiserror`. With `serde` enabled, `Config` serializes
+as a map of builder-method names with variant-name enums (`{"row": 2, "font": "Unscii"}`);
+missing fields deserialize as `Config::new()` defaults.
 
 ### `FBINK_TARGET`
 

@@ -1,7 +1,7 @@
 //! The [`Fbink`] handle: RAII access to the framebuffer & all fd-taking calls.
 
 use crate::config::Config;
-use crate::error::{check, check_nonneg, cstring, Error, Result, ENOSYS, ERANGE};
+use crate::error::{ENOSYS, ERANGE, Error, Result, check, check_nonneg, cstring};
 use crate::rect::Rect;
 use crate::state::State;
 use fbink_sys as sys;
@@ -25,7 +25,8 @@ pub const TOGGLE_GRAYSCALE: u8 = sys::TOGGLE_GRAYSCALE as u8;
 /// same bitmask): `0` means nothing changed, any flag set means FBInk's
 /// internal state (and thus anything you cached from
 /// [`crate::Fbink::state`] or [`Fbink::fb_pointer`]) may be stale.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct ReinitChanges(u32);
 
 impl ReinitChanges {
@@ -72,7 +73,8 @@ impl ReinitChanges {
 
 /// The set of features compiled into the FBInk library, as returned by
 /// [`crate::features`] (mirrors the `fbink-sys` cargo features).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Features(u32);
 
 impl Features {
@@ -299,7 +301,7 @@ impl Fbink {
         // be an exact, unpadded 1-to-4-component image (Y/YA/RGB/RGBA).
         let pixels = w as u64 * h as u64;
         let len = data.len() as u64;
-        if len == 0 || len % pixels != 0 || len / pixels > 4 {
+        if len == 0 || !len.is_multiple_of(pixels) || len / pixels > 4 {
             return Err(Error::Invalid);
         }
         // Safety: data points at `data.len()` readable bytes.
@@ -546,7 +548,7 @@ impl Fbink {
     pub unsafe fn fb_pointer(&self) -> Option<(*mut u8, usize)> {
         let mut size: usize = 0;
         // Safety: upheld by the caller; size is a valid out-pointer.
-        let ptr = sys::fbink_get_fb_pointer(self.fbfd, &mut size);
+        let ptr = unsafe { sys::fbink_get_fb_pointer(self.fbfd, &mut size) };
         if ptr.is_null() {
             None
         } else {
@@ -710,7 +712,8 @@ impl Drop for Fbink {
 
 /// A pixel pre-packed for the *current* framebuffer pixel format, as returned
 /// by [`crate::pack_pixel_gray`]/[`crate::pack_pixel_rgba`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct PackedPixel(pub u32);
 
 /// Map the `rota_*` helpers' peculiar return convention: valid results are

@@ -4,7 +4,7 @@
 //! matching `fbink_free_dump_data()` call exactly once.
 
 use crate::config::Config;
-use crate::error::{check, Result};
+use crate::error::{Result, check};
 use crate::fb::Fbink;
 use crate::rect::Rect;
 use fbink_sys as sys;

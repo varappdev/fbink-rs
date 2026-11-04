@@ -3,7 +3,6 @@ name = "fbink-sys"
 description = "Raw FFI bindings to FBInk, a library to print text & images to an eInk Linux framebuffer"
 version.workspace = true
 edition.workspace = true
-rust-version.workspace = true
 repository.workspace = true
 license.workspace = true
 links = "fbink"

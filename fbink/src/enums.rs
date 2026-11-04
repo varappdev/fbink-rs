@@ -8,11 +8,32 @@
 //! * [`FontStyle`] is `c_int` (`FONT_STYLE_T`, not packed, for ABI reasons),
 //! * [`MtkHalftone`] is `i32` (`MTK_HALFTONE_MODE_INDEX_T`),
 //! * everything else is `u8` (e.g. `FONT_INDEX_T`).
+//!
+//! # String representations
+//!
+//! Every fieldless enum also implements `Display` & `FromStr` (via `strum`),
+//! round-tripping its Rust variant names (`"Gc16"`, `"UnsciiAlt"`, ...), plus
+//! `EnumIter`/`EnumCount` for iteration (e.g. over every [`WaveformMode`]).
+//! With the `serde` feature, all enums serialize the same way (variant names
+//! as strings; data-carrying variants use serde's externally-tagged form,
+//! e.g. `{"Custom": 3}` for [`MtkHalftone::Custom`]).
 
 use fbink_sys as sys;
 
 /// Bundled fixed-cell font (`FONT_INDEX_E`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    strum::Display,
+    strum::EnumString,
+    strum::EnumIter,
+    strum::EnumCount,
+)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum Font {
     Ibm,
     Unscii,
@@ -125,7 +146,19 @@ impl Font {
 }
 
 /// OpenType font style (`FONT_STYLE_E`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    strum::Display,
+    strum::EnumString,
+    strum::EnumIter,
+    strum::EnumCount,
+)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum FontStyle {
     Regular,
     Italic,
@@ -157,7 +190,19 @@ impl FontStyle {
 }
 
 /// Horizontal/vertical alignment (`ALIGN_INDEX_E`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    strum::Display,
+    strum::EnumString,
+    strum::EnumIter,
+    strum::EnumCount,
+)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum Align {
     /// Left (halign) or top (valign).
     None,
@@ -188,7 +233,19 @@ impl Align {
 }
 
 /// Drawing-area padding for OpenType rendering (`PADDING_INDEX_E`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    strum::Display,
+    strum::EnumString,
+    strum::EnumIter,
+    strum::EnumCount,
+)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum Padding {
     None,
     Horizontal,
@@ -220,7 +277,19 @@ impl Padding {
 }
 
 /// Foreground pen color, as an eInk palette index (`FG_COLOR_INDEX_E`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    strum::Display,
+    strum::EnumString,
+    strum::EnumIter,
+    strum::EnumCount,
+)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum FgColor {
     Black,
     Gray1,
@@ -292,7 +361,19 @@ impl FgColor {
 /// The C palette enumerates *downwards* (`BG_WHITE` is 0, `BG_GRAYE` is 1,
 /// ...): the variant names here refer to the same gray *levels* as
 /// [`FgColor`] (i.e. `Gray1` is `0x11` on both), whatever their raw index.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    strum::Display,
+    strum::EnumString,
+    strum::EnumIter,
+    strum::EnumCount,
+)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum BgColor {
     White,
     Gray14,
@@ -363,7 +444,19 @@ impl BgColor {
 ///
 /// Which modes are *actually* available is highly device-dependent: c.f. the
 /// notes in `fbink.h` (in doubt, [`WaveformMode::Auto`] is the safe default).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    strum::Display,
+    strum::EnumString,
+    strum::EnumIter,
+    strum::EnumCount,
+)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum WaveformMode {
     /// Let the EPDC choose via histogram analysis (the default).
     Auto,
@@ -519,7 +612,19 @@ impl WaveformMode {
 }
 
 /// Hardware dithering mode (`HW_DITHER_INDEX_E`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    strum::Display,
+    strum::EnumString,
+    strum::EnumIter,
+    strum::EnumCount,
+)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum HwDither {
     /// No dithering (the default).
     Passthrough,
@@ -560,7 +665,19 @@ impl HwDither {
 }
 
 /// CFA (color filter array) post-process mode (`CFA_MODE_INDEX_E`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    strum::Display,
+    strum::EnumString,
+    strum::EnumIter,
+    strum::EnumCount,
+)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum CfaMode {
     Default,
     AieS4,
@@ -610,7 +727,19 @@ impl CfaMode {
 }
 
 /// NTX (Kobo) kernel rotation quirk type (`NTX_ROTA_INDEX_E`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    strum::Display,
+    strum::EnumString,
+    strum::EnumIter,
+    strum::EnumCount,
+)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum NtxRotaQuirk {
     /// No kernel rotation shenanigans.
     Straight,
@@ -659,7 +788,19 @@ impl NtxRotaQuirk {
 
 /// Rotation policy for sunxi (Kobo Elipsa/Sage) devices
 /// (`SUNXI_FORCE_ROTA_INDEX_E`; raw type is `i8`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    strum::Display,
+    strum::EnumString,
+    strum::EnumIter,
+    strum::EnumCount,
+)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum SunxiForceRota {
     /// Not supported (i.e. not a sunxi device).
     NotSup,
@@ -724,7 +865,19 @@ impl SunxiForceRota {
 
 /// Swipe direction for the Kindle MTK refresh animation
 /// (`MTK_SWIPE_DIRECTION_INDEX_E`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    strum::Display,
+    strum::EnumString,
+    strum::EnumIter,
+    strum::EnumCount,
+)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum MtkSwipeDirection {
     Down,
     Up,
@@ -757,7 +910,8 @@ impl MtkSwipeDirection {
 
 /// Halftone (checkered pattern) mode for Kindle MTK
 /// (`MTK_HALFTONE_MODE_INDEX_E`; raw type is `i32`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum MtkHalftone {
     /// Feature disabled.
     Disabled,
@@ -797,7 +951,19 @@ impl MtkHalftone {
 }
 
 /// Framebuffer pixel format (`FBINK_PXFMT_INDEX_E`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    strum::Display,
+    strum::EnumString,
+    strum::EnumIter,
+    strum::EnumCount,
+)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum PixelFormat {
     Unknown,
     Y4,
@@ -851,7 +1017,19 @@ impl PixelFormat {
 
 /// FBInk build target (`FBINK_TARGET_E`), selected at build time via the
 /// `FBINK_TARGET` environment variable.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    strum::Display,
+    strum::EnumString,
+    strum::EnumIter,
+    strum::EnumCount,
+)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum Target {
     /// Generic Linux (no eInk refresh support).
     Linux,
@@ -957,5 +1135,41 @@ mod tests {
         );
         assert_eq!(FontStyle::BoldItalic.to_raw(), 3);
         assert_eq!(FontStyle::from_raw(2), Some(FontStyle::Bold));
+    }
+
+    #[test]
+    fn strum_strings_roundtrip() {
+        use strum::{EnumCount, IntoEnumIterator};
+        assert_eq!(WaveformMode::Gc16.to_string(), "Gc16");
+        assert_eq!("Gc16".parse(), Ok(WaveformMode::Gc16));
+        assert_eq!(Font::UnsciiAlt.to_string(), "UnsciiAlt");
+        assert_eq!("UnsciiAlt".parse(), Ok(Font::UnsciiAlt));
+        assert!("Nope".parse::<Font>().is_err());
+        // Iteration covers every variant, exactly once.
+        assert_eq!(WaveformMode::iter().count(), WaveformMode::COUNT);
+        assert_eq!(Font::iter().count(), Font::COUNT);
+        assert!(WaveformMode::iter().any(|w| w == WaveformMode::Glrck16));
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serde_uses_variant_names() {
+        assert_eq!(
+            serde_json::to_string(&WaveformMode::Gc16Fast).unwrap(),
+            "\"Gc16Fast\""
+        );
+        assert_eq!(
+            serde_json::from_str::<WaveformMode>("\"Gc16Fast\"").unwrap(),
+            WaveformMode::Gc16Fast
+        );
+        // Data-carrying variants use serde's externally-tagged form.
+        assert_eq!(
+            serde_json::to_string(&MtkHalftone::Custom(3)).unwrap(),
+            "{\"Custom\":3}"
+        );
+        assert_eq!(
+            serde_json::from_str::<MtkHalftone>("{\"Custom\":3}").unwrap(),
+            MtkHalftone::Custom(3)
+        );
     }
 }

@@ -21,7 +21,17 @@ use crate::enums::{Align, BgColor, CfaMode, FgColor, Font, HwDither, WaveformMod
 use fbink_sys as sys;
 
 /// An FBInk configuration, built fluently from FBInk's zeroed defaults.
+///
+/// With the `serde` feature, a `Config` serializes as a plain map of the same
+/// names as the builder methods (`{"row": 2, "font": "Unscii", ...}`), with
+/// enums as variant-name strings. Missing fields deserialize as
+/// [`Config::new`] defaults, so `{}` is a valid config.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(from = "serde_impl::ConfigDef", into = "serde_impl::ConfigDef")
+)]
 pub struct Config {
     raw: sys::FBInkConfig,
 }
@@ -307,6 +317,151 @@ impl Default for Config {
     }
 }
 
+/// Serde support: [`Config`] is a thin wrapper over the raw C struct (whose
+/// fields are untyped integers), so it serializes through this friendly
+/// mirror instead: one field per builder method, named after it, with enums
+/// as variant names. Wired up via `serde(from = ..., into = ...)`.
+#[cfg(feature = "serde")]
+mod serde_impl {
+    use super::*;
+    use serde::{Deserialize, Serialize};
+
+    /// Serde mirror of [`Config`].
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    #[serde(default)]
+    pub(crate) struct ConfigDef {
+        pub row: i16,
+        pub col: i16,
+        pub hoffset: i16,
+        pub voffset: i16,
+        pub halfway: bool,
+        pub fontmult: u8,
+        pub font: Font,
+        pub centered: bool,
+        pub padded: bool,
+        pub right_padded: bool,
+        pub fg_color: FgColor,
+        pub bg_color: BgColor,
+        pub inverted: bool,
+        pub overlay: bool,
+        pub bgless: bool,
+        pub fgless: bool,
+        pub no_viewport: bool,
+        pub flashing: bool,
+        pub cleared: bool,
+        pub waveform: WaveformMode,
+        pub dithering: HwDither,
+        pub sw_dithering: bool,
+        pub cfa_mode: CfaMode,
+        pub nightmode: bool,
+        pub no_refresh: bool,
+        pub no_merge: bool,
+        pub animated: bool,
+        pub halign: Align,
+        pub valign: Align,
+        pub scaled_width: i16,
+        pub scaled_height: i16,
+        pub ignore_alpha: bool,
+        pub saturation_boost: u8,
+        pub verbose: bool,
+        pub quiet: bool,
+        pub to_syslog: bool,
+    }
+
+    impl Default for ConfigDef {
+        fn default() -> Self {
+            // FBInk's documented defaults: a fully zeroed configuration.
+            Config::new().into()
+        }
+    }
+
+    impl From<Config> for ConfigDef {
+        fn from(cfg: Config) -> Self {
+            let raw = cfg.raw();
+            Self {
+                row: raw.row,
+                col: raw.col,
+                hoffset: raw.hoffset,
+                voffset: raw.voffset,
+                halfway: raw.is_halfway,
+                fontmult: raw.fontmult,
+                font: Font::from_raw(raw.fontname).unwrap_or(Font::Ibm),
+                centered: raw.is_centered,
+                padded: raw.is_padded,
+                right_padded: raw.is_rpadded,
+                fg_color: FgColor::from_raw(raw.fg_color).unwrap_or(FgColor::Black),
+                bg_color: BgColor::from_raw(raw.bg_color).unwrap_or(BgColor::White),
+                inverted: raw.is_inverted,
+                overlay: raw.is_overlay,
+                bgless: raw.is_bgless,
+                fgless: raw.is_fgless,
+                no_viewport: raw.no_viewport,
+                flashing: raw.is_flashing,
+                cleared: raw.is_cleared,
+                waveform: WaveformMode::from_raw(raw.wfm_mode).unwrap_or(WaveformMode::Auto),
+                dithering: HwDither::from_raw(raw.dithering_mode).unwrap_or(HwDither::Passthrough),
+                sw_dithering: raw.sw_dithering,
+                cfa_mode: CfaMode::from_raw(raw.cfa_mode).unwrap_or(CfaMode::Default),
+                nightmode: raw.is_nightmode,
+                no_refresh: raw.no_refresh,
+                no_merge: raw.no_merge,
+                animated: raw.is_animated,
+                halign: Align::from_raw(raw.halign).unwrap_or(Align::None),
+                valign: Align::from_raw(raw.valign).unwrap_or(Align::None),
+                scaled_width: raw.scaled_width,
+                scaled_height: raw.scaled_height,
+                ignore_alpha: raw.ignore_alpha,
+                saturation_boost: raw.saturation_boost,
+                verbose: raw.is_verbose,
+                quiet: raw.is_quiet,
+                to_syslog: raw.to_syslog,
+            }
+        }
+    }
+
+    impl From<ConfigDef> for Config {
+        fn from(def: ConfigDef) -> Self {
+            Config::new()
+                .row(def.row)
+                .col(def.col)
+                .hoffset(def.hoffset)
+                .voffset(def.voffset)
+                .halfway(def.halfway)
+                .fontmult(def.fontmult)
+                .font(def.font)
+                .centered(def.centered)
+                .padded(def.padded)
+                .right_padded(def.right_padded)
+                .fg_color(def.fg_color)
+                .bg_color(def.bg_color)
+                .inverted(def.inverted)
+                .overlay(def.overlay)
+                .bgless(def.bgless)
+                .fgless(def.fgless)
+                .no_viewport(def.no_viewport)
+                .flashing(def.flashing)
+                .cleared(def.cleared)
+                .waveform(def.waveform)
+                .dithering(def.dithering)
+                .sw_dithering(def.sw_dithering)
+                .cfa_mode(def.cfa_mode)
+                .nightmode(def.nightmode)
+                .no_refresh(def.no_refresh)
+                .no_merge(def.no_merge)
+                .animated(def.animated)
+                .halign(def.halign)
+                .valign(def.valign)
+                .scaled_width(def.scaled_width)
+                .scaled_height(def.scaled_height)
+                .ignore_alpha(def.ignore_alpha)
+                .saturation_boost(def.saturation_boost)
+                .verbose(def.verbose)
+                .quiet(def.quiet)
+                .to_syslog(def.to_syslog)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -347,5 +502,82 @@ mod tests {
         // Untouched fields stay at their defaults.
         assert!(!cfg.raw().is_flashing);
         assert_eq!(cfg.raw().halign, 0);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serde_roundtrips_every_field() {
+        let cfg = Config::new()
+            .row(2)
+            .col(-1)
+            .hoffset(3)
+            .voffset(-4)
+            .halfway(true)
+            .fontmult(2)
+            .font(Font::UnsciiTall)
+            .centered(true)
+            .padded(true)
+            .right_padded(true)
+            .fg_color(FgColor::Gray7)
+            .bg_color(BgColor::Gray3)
+            .inverted(true)
+            .overlay(true)
+            .bgless(true)
+            .fgless(true)
+            .no_viewport(true)
+            .flashing(true)
+            .cleared(true)
+            .waveform(WaveformMode::Gc16)
+            .dithering(HwDither::Ordered)
+            .sw_dithering(true)
+            .cfa_mode(CfaMode::NtxSf)
+            .nightmode(true)
+            .no_refresh(true)
+            .no_merge(true)
+            .animated(true)
+            .halign(Align::Center)
+            .valign(Align::Edge)
+            .scaled(100, 50)
+            .ignore_alpha(true)
+            .saturation_boost(30)
+            .verbose(true)
+            .quiet(true)
+            .to_syslog(true);
+        let json = serde_json::to_string(&cfg).unwrap();
+        let back: Config = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            serde_impl::ConfigDef::from(back),
+            serde_impl::ConfigDef::from(cfg)
+        );
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serde_uses_builder_names_and_variant_names() {
+        let json = serde_json::to_string(
+            &Config::new()
+                .row(2)
+                .font(Font::Unscii)
+                .waveform(WaveformMode::Gc16),
+        )
+        .unwrap();
+        assert!(json.contains("\"row\":2"));
+        assert!(json.contains("\"font\":\"Unscii\""));
+        assert!(json.contains("\"waveform\":\"Gc16\""));
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serde_tolerates_missing_fields() {
+        // An empty (or partial) config deserializes to FBInk's defaults.
+        let cfg: Config = serde_json::from_str("{}").unwrap();
+        assert_eq!(
+            serde_impl::ConfigDef::from(cfg),
+            serde_impl::ConfigDef::default()
+        );
+        let cfg: Config = serde_json::from_str("{\"row\":3,\"font\":\"Cozette\"}").unwrap();
+        assert_eq!(cfg.raw().row, 3);
+        assert_eq!(cfg.raw().fontname, Font::Cozette.to_raw());
+        assert_eq!(cfg.raw().wfm_mode, 0);
     }
 }

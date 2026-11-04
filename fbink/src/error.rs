@@ -7,7 +7,6 @@
 //! unsigned integer; those are mapped through [`Error::from_errno`].
 
 use std::ffi::{CString, NulError};
-use std::fmt;
 
 /// The `Result` type used by this crate.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -28,36 +27,47 @@ pub(crate) const ENOTSUP: i32 = 95; // == EOPNOTSUPP on Linux
 ///
 /// The variants map the negative return codes documented in FBInk's `fbink.h`;
 /// on unknown codes, [`Error::Other`] carries the *positive* errno value.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, thiserror::Error)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub enum Error {
     /// Generic failure: `-(EXIT_FAILURE)`.
     ///
     /// NOTE: FBInk uses `-(EXIT_FAILURE)` (i.e. `-1`) as its default failure
     /// code, which makes it ambiguous with `-EPERM`; it is special-cased first.
+    #[error("generic FBInk failure (-(EXIT_FAILURE))")]
     Failure,
     /// `-ENOSYS` or `-ENOTSUP`: the call is not supported in this build
     /// (e.g. MINIMAL build w/o DRAW) or on this platform/device.
+    #[error("not supported by this FBInk build or platform (ENOSYS/ENOTSUP)")]
     NotSupported,
     /// `-EINVAL`: invalid argument (e.g. an empty string).
+    #[error("invalid argument (EINVAL)")]
     Invalid,
     /// `-EILSEQ`: the string was not a valid UTF-8 sequence.
+    #[error("string is not valid UTF-8 (EILSEQ)")]
     InvalidUtf8,
     /// `-ERANGE`: value out of range (e.g. OT margins, invalid rotation).
+    #[error("value out of range (ERANGE)")]
     OutOfRange,
     /// `-ENOSPC`: the content doesn't fit (e.g. `no_truncation` was requested).
+    #[error("content does not fit (ENOSPC)")]
     NoSpace,
     /// `-ENODATA`: required data is missing (e.g. no OT font loaded).
+    #[error("required data missing (ENODATA)")]
     NoData,
     /// `-ENODEV`: the device is missing or the call happened out of order
     /// (e.g. before `fbink_init`).
+    #[error("device missing or call out of order (ENODEV)")]
     NoDevice,
     /// A Rust string handed to FBInk contained an interior NUL byte.
     ///
     /// This is a purely Rust-side error: such a string cannot be represented as
     /// a C string, so the call was never made.
+    #[error("string contains an interior NUL byte")]
     InteriorNul,
     /// Any other errno, stored as its *positive* value (e.g. `Other(125)` for
     /// `-ECANCELED`).
+    #[error("FBInk failed with errno {0}")]
     Other(i32),
 }
 
@@ -87,30 +97,6 @@ impl Error {
         }
     }
 }
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::Failure => write!(f, "generic FBInk failure (-(EXIT_FAILURE))"),
-            Error::NotSupported => {
-                write!(
-                    f,
-                    "not supported by this FBInk build or platform (ENOSYS/ENOTSUP)"
-                )
-            }
-            Error::Invalid => write!(f, "invalid argument (EINVAL)"),
-            Error::InvalidUtf8 => write!(f, "string is not valid UTF-8 (EILSEQ)"),
-            Error::OutOfRange => write!(f, "value out of range (ERANGE)"),
-            Error::NoSpace => write!(f, "content does not fit (ENOSPC)"),
-            Error::NoData => write!(f, "required data missing (ENODATA)"),
-            Error::NoDevice => write!(f, "device missing or call out of order (ENODEV)"),
-            Error::InteriorNul => write!(f, "string contains an interior NUL byte"),
-            Error::Other(e) => write!(f, "FBInk failed with errno {e}"),
-        }
-    }
-}
-
-impl std::error::Error for Error {}
 
 impl From<NulError> for Error {
     fn from(_: NulError) -> Self {
@@ -182,5 +168,57 @@ mod tests {
     fn rejects_interior_nul() {
         let err = cstring("foo\0bar").unwrap_err();
         assert_eq!(err, Error::InteriorNul);
+    }
+
+    #[test]
+    fn display_messages_are_stable() {
+        // The `#[error(...)]` strings must keep matching the old hand-written
+        // Display impl (callers match on them).
+        assert_eq!(
+            Error::Failure.to_string(),
+            "generic FBInk failure (-(EXIT_FAILURE))"
+        );
+        assert_eq!(
+            Error::NotSupported.to_string(),
+            "not supported by this FBInk build or platform (ENOSYS/ENOTSUP)"
+        );
+        assert_eq!(Error::Invalid.to_string(), "invalid argument (EINVAL)");
+        assert_eq!(
+            Error::InvalidUtf8.to_string(),
+            "string is not valid UTF-8 (EILSEQ)"
+        );
+        assert_eq!(Error::OutOfRange.to_string(), "value out of range (ERANGE)");
+        assert_eq!(Error::NoSpace.to_string(), "content does not fit (ENOSPC)");
+        assert_eq!(Error::NoData.to_string(), "required data missing (ENODATA)");
+        assert_eq!(
+            Error::NoDevice.to_string(),
+            "device missing or call out of order (ENODEV)"
+        );
+        assert_eq!(
+            Error::InteriorNul.to_string(),
+            "string contains an interior NUL byte"
+        );
+        assert_eq!(Error::Other(5).to_string(), "FBInk failed with errno 5");
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn serde_roundtrips() {
+        assert_eq!(
+            serde_json::to_string(&Error::Invalid).unwrap(),
+            "\"Invalid\""
+        );
+        assert_eq!(
+            serde_json::from_str::<Error>("\"Invalid\"").unwrap(),
+            Error::Invalid
+        );
+        assert_eq!(
+            serde_json::to_string(&Error::Other(5)).unwrap(),
+            "{\"Other\":5}"
+        );
+        assert_eq!(
+            serde_json::from_str::<Error>("{\"Other\":5}").unwrap(),
+            Error::Other(5)
+        );
     }
 }
