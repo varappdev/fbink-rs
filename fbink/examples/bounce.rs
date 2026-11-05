@@ -34,7 +34,7 @@ use fbink::{Config, Fbink, Font, LAST_MARKER, Rect, WaveformMode};
 const RADIUS: i32 = 60;
 /// Target frame rate (wall-clock paced; the panel shows as many distinct
 /// frames per second as its DU waveform physically allows).
-const FPS: u64 = 20;
+const FPS: u64 = 10;
 /// Ball speed, in pixels per frame (x, y).
 const SPEED: (f32, f32) = (19.0, 15.0);
 
