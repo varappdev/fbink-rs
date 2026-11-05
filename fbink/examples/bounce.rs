@@ -3,8 +3,20 @@
 //! A moving-object demo for the safe bindings: each frame erases the
 //! previous ball, redraws it at its new position (a filled circle, one
 //! scanline at a time), and refreshes only the dirty region, in the fast
-//! DU waveform (light ghosting, never flashes), paced by
-//! [`Fbink::wait_for_complete`].
+//! DU waveform (light ghosting, never flashes).
+//!
+//! Frames are paced against the wall clock, *never* against the panel:
+//! fencing every update with [`Fbink::wait_for_complete`] would throttle the
+//! loop to the waveform's completion rate, as that wait blocks until the
+//! update has *fully* completed — longer than it stays visibly refreshing
+//! (a DU update completes in a few hundred ms on most panels). Instead,
+//! updates are submitted and immediately moved on from: the EPDC's
+//! QUEUE_AND_MERGE scheme folds in-flight frames together, so the panel
+//! always shows the newest ball position as fast as the waveform allows.
+//! [`Fbink::wait_for_complete`] is only used to fence the *flashing*
+//! refreshes at both ends of the run (draining in-flight frames before the
+//! exit flash), per FBInk's guidance: blocking around a flashing update keeps
+//! it from being affected by the surrounding ones.
 //!
 //! The screen is snapshotted ([`Fbink::dump`]) before the first pixel is
 //! painted and restored ([`Fbink::restore`]) on exit, so the device's own
@@ -20,7 +32,8 @@ use fbink::{Config, Fbink, Font, LAST_MARKER, Rect, WaveformMode};
 
 /// Ball radius, in pixels.
 const RADIUS: i32 = 60;
-/// Target frame rate (eInk DU updates top out around 15-20 fps anyway).
+/// Target frame rate (wall-clock paced; the panel shows as many distinct
+/// frames per second as its DU waveform physically allows).
 const FPS: u64 = 20;
 /// Ball speed, in pixels per frame (x, y).
 const SPEED: (f32, f32) = (19.0, 15.0);
@@ -79,6 +92,8 @@ fn main() -> fbink::Result<()> {
     let frame_budget = Duration::from_micros(1_000_000 / FPS);
     let mut ball: Option<Rect> = None;
     let mut done: u64 = 0;
+    // Per-phase wall-clock accounting, to see where a frame actually goes.
+    let (mut t_fill, mut t_submit, mut t_pace) = (Duration::ZERO, Duration::ZERO, Duration::ZERO);
     let start = Instant::now();
 
     for _ in 0..frames {
@@ -103,29 +118,47 @@ fn main() -> fbink::Result<()> {
         }
 
         // Erase the previous ball (white), then draw the new one (black).
+        let t = Instant::now();
         if let Some(prev) = ball {
             fb.fill_rect_gray(&paint, Some(&prev), false, 0xFF)?;
         }
         let bbox = draw_ball(&fb, &paint, cx as i32, cy as i32)?;
+        t_fill += t.elapsed();
 
         // Refresh just the old ∪ new region, in fast DU mode.
         let dirty = match ball.replace(bbox) {
             Some(prev) => union(prev, bbox),
             None => bbox,
         };
+        let t = Instant::now();
         fb.refresh_rect(&dirty, &du)?;
-        fb.wait_for_complete(LAST_MARKER)?;
+        t_submit += t.elapsed();
         done += 1;
 
-        // Pace the animation (wait_for_complete already blocks a while).
+        // Pace against the wall clock. Never wait for the panel here: the
+        // loop would drop to the waveform's *completion* rate (~3fps on many
+        // devices), while submitted frames pile up nowhere — the EPDC merges
+        // them (QUEUE_AND_MERGE) and paints the newest ball position at its
+        // own pace.
+        let t = Instant::now();
         if let Some(rest) = frame_budget.checked_sub(t0.elapsed()) {
             std::thread::sleep(rest);
         }
+        t_pace += t.elapsed();
     }
 
     // Leave the screen exactly as we found it: repaint the UI snapshot.
     // `restore` honors the config's refresh flags, like `refresh`.
     let bye = Config::new().waveform(WaveformMode::Gc16);
+    // Per FBInk's guidance, fence *before* a flashing update: drain in-flight
+    // animation frames first, so the flash isn't affected by them. This is
+    // also where the panel's backlog surfaces (the DU completion latency):
+    // best-effort, as the restore below matters more than the fence.
+    let t = Instant::now();
+    if let Err(e) = fb.wait_for_complete(LAST_MARKER) {
+        eprintln!("warning: wait_for_complete failed ({e}); restore may pick up stray frames");
+    }
+    let drain = t.elapsed();
     match &snapshot {
         Some(dump) => fb.restore(&bye, dump)?,
         // Fallback when there is no snapshot: blank screen + refresh.
@@ -136,11 +169,25 @@ fn main() -> fbink::Result<()> {
     }
     fb.wait_for_complete(LAST_MARKER)?;
 
+    let elapsed = start.elapsed();
     println!(
-        "bounced {} frames in {:?} (~{} fps)",
+        "bounced {} frames in {:?} (~{:.1} fps)",
         done,
-        start.elapsed(),
-        FPS
+        elapsed,
+        done as f64 / elapsed.as_secs_f64()
+    );
+    if done > 0 {
+        let per = |d: Duration| d.as_millis() as f64 / done as f64;
+        println!(
+            "  per frame: fill {:.1}ms, submit {:.1}ms, pacing {:.1}ms",
+            per(t_fill),
+            per(t_submit),
+            per(t_pace)
+        );
+    }
+    println!(
+        "  panel backlog drained before restore: {}ms",
+        drain.as_millis()
     );
     Ok(())
 }
