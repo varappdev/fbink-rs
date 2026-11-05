@@ -2,8 +2,17 @@
 //!
 //! A moving-object demo for the safe bindings: each frame erases the
 //! previous ball, redraws it at its new position (a filled circle, one
-//! scanline at a time), and refreshes only the dirty region, in the fast
-//! DU waveform (light ghosting, never flashes).
+//! scanline at a time), and refreshes the region the ball has swept
+//! recently, in the fast DU waveform (light ghosting, never flashes).
+//!
+//! Why the *swept* region and not just old ∪ new: any submission rate above
+//! the panel's waveform rate gets frames coalesced or dropped by the driver
+//! (it displays the newest state of whatever survives). A per-frame dirty
+//! rect only erases one ball position back, so a skipped frame's erase never
+//! reaches the panel and its position stays painted black — long black
+//! streaks along the path. Refreshing the whole recent sweep means every
+//! processed update re-erases everything the skipped ones would have, no
+//! matter which frames the driver keeps.
 //!
 //! Frames are paced against the wall clock, *never* against the panel:
 //! fencing every update with [`Fbink::wait_for_complete`] would throttle the
@@ -22,28 +31,30 @@
 //! painted and restored ([`Fbink::restore`]) on exit, so the device's own
 //! UI is exactly as we found it: it doesn't know it needs to redraw itself.
 //!
-//! Usage: `bounce [SECONDS]` (default 15; 0 = run until Ctrl-C).
-//! Run it on a device with an eInk framebuffer; host builds are for
-//! compile-testing only. See the README for cross-compiling recipes.
+//! Usage: `bounce [SECONDS] [FPS]` (defaults: 15 seconds at the built-in
+//! [`FPS`] rate; 0 = run until Ctrl-C). Run it on a device with an eInk
+//! framebuffer; host builds are for compile-testing only. See the README
+//! for cross-compiling recipes.
 
+use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
 use fbink::{Config, Fbink, Font, LAST_MARKER, Rect, WaveformMode};
 
 /// Ball radius, in pixels.
 const RADIUS: i32 = 60;
-/// Target frame rate (wall-clock paced; the panel shows as many distinct
-/// frames per second as its DU waveform physically allows).
+/// Default target frame rate (overridable via the `FPS` argument; wall-clock
+/// paced — the panel shows as many distinct frames per second as its DU
+/// waveform physically allows).
 const FPS: u64 = 10;
 /// Ball speed, in pixels per frame (x, y).
 const SPEED: (f32, f32) = (19.0, 15.0);
 
 fn main() -> fbink::Result<()> {
-    let secs: u64 = std::env::args()
-        .nth(1)
-        .and_then(|a| a.parse().ok())
-        .unwrap_or(15);
-    let frames = if secs == 0 { u64::MAX } else { secs * FPS };
+    let mut args = std::env::args().skip(1);
+    let secs: u64 = args.next().and_then(|a| a.parse().ok()).unwrap_or(15);
+    let fps: u64 = args.next().and_then(|a| a.parse().ok()).unwrap_or(FPS);
+    let frames = if secs == 0 { u64::MAX } else { secs * fps };
 
     let fb = Fbink::open()?;
     // Init once (from the main thread!), keeping FBInk's setup chatter quiet.
@@ -89,8 +100,13 @@ fn main() -> fbink::Result<()> {
     // ourselves (and per-scanline refreshes would be rejected as too small).
     let paint = Config::new().no_refresh(true);
     let du = Config::new().waveform(WaveformMode::Du);
-    let frame_budget = Duration::from_micros(1_000_000 / FPS);
-    let mut ball: Option<Rect> = None;
+    let frame_budget = Duration::from_micros(1_000_000 / fps);
+    // Ball boxes from the last half second: every update repaints their union,
+    // so a processed frame re-erases whatever the skipped ones would have.
+    // Half a second comfortably covers one waveform (~250-450ms) worth of
+    // coalesced frames at any sane frame rate.
+    let sweep = (fps / 2).clamp(4, 64) as usize;
+    let mut trail: VecDeque<Rect> = VecDeque::with_capacity(sweep + 1);
     let mut done: u64 = 0;
     // Per-phase wall-clock accounting, to see where a frame actually goes.
     let (mut t_fill, mut t_submit, mut t_pace) = (Duration::ZERO, Duration::ZERO, Duration::ZERO);
@@ -119,17 +135,19 @@ fn main() -> fbink::Result<()> {
 
         // Erase the previous ball (white), then draw the new one (black).
         let t = Instant::now();
-        if let Some(prev) = ball {
+        if let Some(&prev) = trail.back() {
             fb.fill_rect_gray(&paint, Some(&prev), false, 0xFF)?;
         }
         let bbox = draw_ball(&fb, &paint, cx as i32, cy as i32)?;
         t_fill += t.elapsed();
 
-        // Refresh just the old ∪ new region, in fast DU mode.
-        let dirty = match ball.replace(bbox) {
-            Some(prev) => union(prev, bbox),
-            None => bbox,
-        };
+        // Refresh the swept region (see the module docs): the union of the
+        // ball's boxes over the last half second, in fast DU mode.
+        trail.push_back(bbox);
+        while trail.len() > sweep {
+            trail.pop_front();
+        }
+        let dirty = trail.iter().copied().reduce(union).unwrap_or(bbox);
         let t = Instant::now();
         fb.refresh_rect(&dirty, &du)?;
         t_submit += t.elapsed();
