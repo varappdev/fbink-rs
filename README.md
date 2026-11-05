@@ -114,6 +114,9 @@ Then:
 
 Output: `target/armv7-unknown-linux-musleabihf/<profile>/examples/fbink-sys-demo`
 
+Set `FBINK_BUILD` to cross-build something else with the same recipe, e.g. the safe
+bindings' examples: `FBINK_BUILD="-p fbink --examples" ./scripts/build-demo-arm.sh`.
+
 The script (and `scripts/zig-cc-arm`) take care of the fiddly parts:
 
 - `zig cc -target arm-linux-musleabihf` as the C compiler for FBInk and as the linker

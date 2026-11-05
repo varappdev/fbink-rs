@@ -7,6 +7,10 @@
 #
 # Output: target/armv7-unknown-linux-musleabihf/<profile>/examples/fbink-sys-demo
 # Deploy: scp -O -P 4022 <output> root@127.0.0.1:/mnt/us/
+#
+# FBINK_BUILD overrides the cargo selection flags, e.g. to cross-build the
+# safe bindings' examples instead:
+#   FBINK_BUILD="-p fbink --examples" ./scripts/build-demo-arm.sh
 set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -30,5 +34,5 @@ env "CC_armv7_unknown_linux_musleabihf=$CC_ARM" \
     "CARGO_TARGET_ARMV7_UNKNOWN_LINUX_MUSLEABIHF_LINKER=$CC_ARM" \
     "RUSTFLAGS=-C link-self-contained=no" \
     FBINK_TARGET=kindle \
-    cargo build -p fbink-sys --example fbink-sys-demo \
+    cargo build ${FBINK_BUILD:--p fbink-sys --example fbink-sys-demo} \
     --target armv7-unknown-linux-musleabihf "$@"
